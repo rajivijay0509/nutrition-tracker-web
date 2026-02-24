@@ -7,13 +7,13 @@ import './styles/App.css';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
-import { 
-  FoodLoggingPage, 
-  HistoryPage, 
-  WellnessPage, 
-  RecipesPage, 
-  ProfilePage 
-} from './pages/index';
+import FoodLoggingPage from './pages/FoodLoggingPage';
+import WellnessPage from './pages/WellnessPage';
+import HistoryPage from './pages/HistoryPage';
+import RecipesPage from './pages/RecipesPage';
+import ProfilePage from './pages/ProfilePage';
+import GoalsPage from './pages/GoalsPage';
+import CommunityPage from './pages/CommunityPage';
 
 // Components
 import Layout from './components/Layout';
@@ -25,12 +25,28 @@ const ProtectedRoute = ({ element }) => {
 };
 
 function App() {
-  const { isAuthenticated, initialize } = useAuthStore();
+  const { isAuthenticated, isInitialized, initialize } = useAuthStore();
 
   useEffect(() => {
     // Initialize Supabase auth session
     initialize();
   }, [initialize]);
+
+  // Show loading state until auth is initialized
+  if (!isInitialized) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh',
+        fontSize: '1.2rem',
+        color: '#6b7280'
+      }}>
+        Loading...
+      </div>
+    );
+  }
 
   return (
     <Router>
@@ -55,6 +71,8 @@ function App() {
           <Route path="/history" element={<HistoryPage />} />
           <Route path="/wellness" element={<WellnessPage />} />
           <Route path="/recipes" element={<RecipesPage />} />
+          <Route path="/goals" element={<GoalsPage />} />
+          <Route path="/community" element={<CommunityPage />} />
           <Route path="/profile" element={<ProfilePage />} />
         </Route>
 

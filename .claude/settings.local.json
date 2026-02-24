@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(npm install:*)",
-      "Bash(start chrome \"http://localhost:3007\")"
+      "Bash(start chrome \"http://localhost:3007\")",
+      "Bash(npm run build:*)"
     ]
   }
 }

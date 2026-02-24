@@ -5,6 +5,7 @@ export const useAuthStore = create((set, get) => ({
   user: null,
   session: null,
   isAuthenticated: false,
+  isInitialized: false,
   isLoading: false,
   error: null,
 
@@ -12,13 +13,12 @@ export const useAuthStore = create((set, get) => ({
   initialize: async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        set({
-          session,
-          user: session.user,
-          isAuthenticated: true,
-        });
-      }
+      set({
+        session,
+        user: session?.user || null,
+        isAuthenticated: !!session,
+        isInitialized: true,
+      });
 
       // Listen for auth changes
       supabase.auth.onAuthStateChange((_event, session) => {
@@ -30,6 +30,7 @@ export const useAuthStore = create((set, get) => ({
       });
     } catch (error) {
       console.error('Auth initialization error:', error);
+      set({ isInitialized: true });
     }
   },
 

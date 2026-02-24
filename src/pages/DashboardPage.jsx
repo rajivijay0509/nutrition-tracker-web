@@ -7,68 +7,152 @@ import '../styles/Dashboard.css';
 
 const DashboardPage = () => {
   const navigate = useNavigate();
-  const { getDailyMeals, selectedDate, setSelectedDate } = useFoodStore();
-  const { getWellness } = useWellnessStore();
-  
-  const [dailyMeals, setDailyMeals] = useState(null);
+  const { getDailyMeals, selectedDate, setSelectedDate, meals } = useFoodStore();
+  const { getWellness, wellness: wellnessStore } = useWellnessStore();
+
+  const [dailyMeals, setDailyMeals] = useState([]);
   const [wellness, setWellness] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [weekTrendData, setWeekTrendData] = useState([]);
 
-  // Sample data - will be replaced with API calls
-  const mockDailyData = {
-    calories: 650,
-    target: 850,
-    protein: 75,
-    carbs: 65,
-    fat: 18,
-    meals: [
-      { time: '8:00 AM', name: 'Fat + Tea', calories: 116, status: 'logged' },
-      { time: '10:00 AM', name: 'Egg Whites', calories: 136, status: 'logged' },
-      { time: '12:00 PM', name: 'Broccoli Salad', calories: 234, status: 'logged' },
-      { time: '2:00 PM', name: 'Protein Meal', status: 'not-logged' },
-      { time: '4:00 PM', name: 'Vegetable Meal', status: 'not-logged' },
-      { time: '6:00 PM', name: 'Protein / Fiber', status: 'not-logged' },
-      { time: '8:00 PM', name: 'Fiber Drink', status: 'not-logged' },
-    ],
+  // Target values (default, should come from profile settings)
+  const DAILY_CALORIE_TARGET = 850;
+
+  // Calculate daily metrics from stored meals
+  const calculateDailyMetrics = (mealsArray) => {
+    if (!mealsArray || mealsArray.length === 0) {
+      return {
+        calories: 0,
+        protein: 0,
+        carbs: 0,
+        fat: 0,
+        loggedCount: 0,
+      };
+    }
+
+    const totals = mealsArray.reduce((acc, meal) => {
+      const foodItems = meal.foodItems || [];
+      const mealCalories = foodItems.reduce((sum, item) => sum + (item.calories || 0), 0);
+
+      return {
+        calories: acc.calories + mealCalories,
+        loggedCount: acc.loggedCount + 1,
+        // Approximate macros based on typical distribution
+        protein: acc.protein + (mealCalories * 0.25) / 4, // 25% protein
+        carbs: acc.carbs + (mealCalories * 0.50) / 4, // 50% carbs
+        fat: acc.fat + (mealCalories * 0.25) / 9, // 25% fat
+      };
+    }, { calories: 0, protein: 0, carbs: 0, fat: 0, loggedCount: 0 });
+
+    return {
+      calories: Math.round(totals.calories),
+      protein: Math.round(totals.protein),
+      carbs: Math.round(totals.carbs),
+      fat: Math.round(totals.fat),
+      loggedCount: totals.loggedCount,
+    };
   };
 
-  const mockWellnessData = {
-    mood: '😊',
-    energy: 4,
-    sleep: 7.5,
-    symptoms: [],
+  // Format meals for display
+  const formatMealsForDisplay = (mealsArray) => {
+    const mealTimes = ['8:00 AM', '10:00 AM', '12:00 PM', '2:00 PM', '4:00 PM', '6:00 PM', '8:00 PM'];
+
+    if (!mealsArray || mealsArray.length === 0) {
+      return mealTimes.map((time, idx) => ({
+        time,
+        name: 'Log meal',
+        calories: 0,
+        status: 'not-logged',
+      }));
+    }
+
+    // Create a map of logged meals by time
+    const mealMap = new Map();
+    mealsArray.forEach(meal => {
+      mealMap.set(meal.mealTimeSlot, meal);
+    });
+
+    // Create display array with logged and not-logged meals
+    return mealTimes.map(time => {
+      const meal = mealMap.get(time);
+      if (meal) {
+        const foodNames = meal.foodItems?.map(f => f.foodName).join(', ') || 'Logged meal';
+        return {
+          time,
+          name: foodNames,
+          calories: meal.calories || 0,
+          status: 'logged',
+        };
+      }
+      return {
+        time,
+        name: 'Log meal',
+        calories: 0,
+        status: 'not-logged',
+      };
+    });
   };
 
-  const weekTrendData = [
-    { date: 'Mon', calories: 745, target: 850 },
-    { date: 'Tue', calories: 812, target: 850 },
-    { date: 'Wed', calories: 690, target: 850 },
-    { date: 'Thu', calories: 895, target: 850 },
-    { date: 'Fri', calories: 760, target: 850 },
-    { date: 'Sat', calories: 820, target: 850 },
-    { date: 'Sun', calories: 650, target: 850 },
-  ];
+  // Generate week trend data
+  const generateWeekTrendData = () => {
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const today = new Date();
+
+    return days.map((dayName, idx) => {
+      const date = new Date(today);
+      date.setDate(date.getDate() - (6 - idx));
+      const dateStr = date.toISOString().split('T')[0];
+
+      // Get meals for this date from store
+      const dayMeals = meals[dateStr] || [];
+      const dayMetrics = calculateDailyMetrics(dayMeals);
+
+      return {
+        date: dayName,
+        calories: dayMetrics.calories,
+        target: DAILY_CALORIE_TARGET,
+      };
+    });
+  };
 
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      // In real app, fetch from API
-      // const meals = await getDailyMeals(selectedDate);
-      // const wellness = await getWellness(selectedDate);
-      setDailyMeals(mockDailyData);
-      setWellness(mockWellnessData);
-      setLoading(false);
+      try {
+        // Fetch meals for selected date
+        const fetchedMeals = await getDailyMeals(selectedDate);
+        const mealsArray = Array.isArray(fetchedMeals) ? fetchedMeals : (fetchedMeals?.meals || []);
+        setDailyMeals(mealsArray);
+
+        // Fetch wellness for selected date
+        const fetchedWellness = await getWellness(selectedDate);
+        setWellness(fetchedWellness || {
+          moodEmoji: ':-|',
+          energyLevel: 3,
+          sleepHours: 0,
+        });
+
+        // Generate week trend
+        setWeekTrendData(generateWeekTrendData());
+      } catch (error) {
+        console.error('Error loading dashboard data:', error);
+      } finally {
+        setLoading(false);
+      }
     };
 
     loadData();
-  }, [selectedDate]);
+  }, [selectedDate, meals]);
 
-  const caloriePercentage = Math.round((mockDailyData.calories / mockDailyData.target) * 100);
+  // Calculate current day metrics
+  const dailyMetrics = calculateDailyMetrics(dailyMeals);
+  const caloriePercentage = Math.round((dailyMetrics.calories / DAILY_CALORIE_TARGET) * 100);
   const macroData = [
-    { name: 'Protein', value: mockDailyData.protein, fill: '#06b6d4' },
-    { name: 'Carbs', value: mockDailyData.carbs, fill: '#10b981' },
-    { name: 'Fat', value: mockDailyData.fat, fill: '#f59e0b' },
+    { name: 'Protein', value: dailyMetrics.protein, fill: '#06b6d4' },
+    { name: 'Carbs', value: dailyMetrics.carbs, fill: '#10b981' },
+    { name: 'Fat', value: dailyMetrics.fat, fill: '#f59e0b' },
   ];
+  const displayMeals = formatMealsForDisplay(dailyMeals);
 
   const handleMealClick = () => {
     navigate('/food-logging');
@@ -87,8 +171,8 @@ const DashboardPage = () => {
           <p className="page-subtitle">Today's nutrition overview</p>
         </div>
         <div className="date-selector">
-          <input 
-            type="date" 
+          <input
+            type="date"
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
             className="date-input"
@@ -98,7 +182,7 @@ const DashboardPage = () => {
 
       {/* Main Grid */}
       <div className="dashboard-grid">
-        
+
         {/* Calorie Tracker Card - Large */}
         <div className="card card-lg">
           <div className="card-header">
@@ -123,18 +207,18 @@ const DashboardPage = () => {
                   />
                 </svg>
                 <div className="calorie-text">
-                  <div className="calorie-value">{mockDailyData.calories}</div>
-                  <div className="calorie-label">/ {mockDailyData.target} kcal</div>
+                  <div className="calorie-value">{dailyMetrics.calories}</div>
+                  <div className="calorie-label">/ {DAILY_CALORIE_TARGET} kcal</div>
                 </div>
               </div>
               <div className="calorie-stats">
                 <div className="stat-item">
                   <span className="stat-label">Remaining</span>
-                  <span className="stat-value">{mockDailyData.target - mockDailyData.calories} kcal</span>
+                  <span className="stat-value">{Math.max(DAILY_CALORIE_TARGET - dailyMetrics.calories, 0)} kcal</span>
                 </div>
                 <div className="stat-item">
                   <span className="stat-label">Logged Meals</span>
-                  <span className="stat-value">3 / 7</span>
+                  <span className="stat-value">{dailyMetrics.loggedCount} / 7</span>
                 </div>
               </div>
             </div>
@@ -148,7 +232,7 @@ const DashboardPage = () => {
 
         {/* Macros & Wellness Cards */}
         <div className="cards-column">
-          
+
           {/* Macros Card */}
           <div className="card">
             <h4>Macronutrients</h4>
@@ -176,15 +260,15 @@ const DashboardPage = () => {
             <h4>Wellness Check</h4>
             <div className="wellness-grid">
               <div className="wellness-item">
-                <span className="wellness-emoji">{wellness?.mood || '😐'}</span>
+                <span className="wellness-emoji">{wellness?.moodEmoji || ':-|'}</span>
                 <span className="wellness-label">Mood</span>
               </div>
               <div className="wellness-item">
-                <span className="wellness-value">{wellness?.energy || 3}/5</span>
+                <span className="wellness-value">{wellness?.energyLevel || 3}/5</span>
                 <span className="wellness-label">Energy</span>
               </div>
               <div className="wellness-item">
-                <span className="wellness-value">{wellness?.sleep || 0}h</span>
+                <span className="wellness-value">{wellness?.sleepHours || 0}h</span>
                 <span className="wellness-label">Sleep</span>
               </div>
             </div>
@@ -199,10 +283,10 @@ const DashboardPage = () => {
       <div className="card">
         <div className="card-header">
           <h3>Today's Meals</h3>
-          <span className="badge badge-success">3 Logged</span>
+          <span className="badge badge-success">{dailyMetrics.loggedCount} Logged</span>
         </div>
         <div className="meals-list">
-          {mockDailyData.meals.map((meal, idx) => (
+          {displayMeals.map((meal, idx) => (
             <div key={idx} className={`meal-item ${meal.status}`}>
               <div className="meal-info">
                 <span className="meal-time">{meal.time}</span>
@@ -211,7 +295,7 @@ const DashboardPage = () => {
               {meal.status === 'logged' && (
                 <>
                   <span className="meal-calories">{meal.calories} kcal</span>
-                  <span className="status-badge">✓</span>
+                  <span className="status-badge">Done</span>
                 </>
               )}
               {meal.status === 'not-logged' && (
@@ -232,7 +316,7 @@ const DashboardPage = () => {
             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
             <XAxis dataKey="date" stroke="#9ca3af" />
             <YAxis stroke="#9ca3af" />
-            <Tooltip 
+            <Tooltip
               contentStyle={{
                 background: 'white',
                 border: '1px solid #e5e7eb',
@@ -240,18 +324,18 @@ const DashboardPage = () => {
                 boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
               }}
             />
-            <Line 
-              type="monotone" 
-              dataKey="calories" 
-              stroke="#06b6d4" 
+            <Line
+              type="monotone"
+              dataKey="calories"
+              stroke="#06b6d4"
               strokeWidth={2}
               dot={{ fill: '#06b6d4', r: 4 }}
               name="Actual"
             />
-            <Line 
-              type="monotone" 
-              dataKey="target" 
-              stroke="#d1d5db" 
+            <Line
+              type="monotone"
+              dataKey="target"
+              stroke="#d1d5db"
               strokeWidth={2}
               strokeDasharray="5 5"
               dot={false}

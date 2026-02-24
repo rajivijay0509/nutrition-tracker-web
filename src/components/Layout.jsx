@@ -7,7 +7,7 @@ const Layout = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuthStore();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -15,87 +15,108 @@ const Layout = () => {
   };
 
   const menuItems = [
-    { label: 'Dashboard', icon: '📊', path: '/' },
-    { label: 'Food Logging', icon: '🍽️', path: '/food-logging' },
-    { label: 'Wellness', icon: '💪', path: '/wellness' },
-    { label: 'Recipes', icon: '👨‍🍳', path: '/recipes' },
-    { label: 'History', icon: '📈', path: '/history' },
-    { label: 'Profile', icon: '👤', path: '/profile' },
+    { label: 'Dashboard', icon: 'D', path: '/' },
+    { label: 'Food Log', icon: 'F', path: '/food-logging' },
+    { label: 'Wellness', icon: 'W', path: '/wellness' },
+    { label: 'Recipes', icon: 'R', path: '/recipes' },
+    { label: 'Community', icon: 'C', path: '/community' },
+    { label: 'History', icon: 'H', path: '/history' },
+    { label: 'Goals', icon: 'G', path: '/goals' },
   ];
 
+  const handleNavClick = (path) => {
+    navigate(path);
+    setMobileMenuOpen(false);
+  };
+
   return (
-    <div className="layout">
-      {/* Sidebar */}
-      <aside className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
-        <div className="sidebar-header">
-          <div className="logo">
-            <span className="logo-emoji">🥗</span>
-            <span className="logo-text">NutriTrack</span>
+    <div className="layout-horizontal">
+      {/* Top Navigation Bar */}
+      <header className="top-nav">
+        <div className="nav-container">
+          {/* Logo */}
+          <div className="nav-brand" onClick={() => navigate('/')}>
+            <span className="brand-icon">N</span>
+            <span className="brand-text">NutriTrack</span>
           </div>
-          <button
-            className="sidebar-toggle"
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            title="Toggle sidebar"
-          >
-            {sidebarOpen ? '◀' : '▶'}
-          </button>
-        </div>
 
-        <nav className="sidebar-nav">
-          {menuItems.map((item) => (
-            <a
-              key={item.path}
-              href={item.path}
-              className={`nav-item ${location.pathname === item.path ? 'active' : ''}`}
-              onClick={(e) => {
-                e.preventDefault();
-                navigate(item.path);
-              }}
-              title={item.label}
+          {/* Desktop Navigation */}
+          <nav className="nav-menu desktop-nav">
+            {menuItems.map((item) => (
+              <button
+                key={item.path}
+                className={`nav-link ${location.pathname === item.path ? 'active' : ''}`}
+                onClick={() => handleNavClick(item.path)}
+              >
+                <span className="nav-link-icon">{item.icon}</span>
+                <span className="nav-link-text">{item.label}</span>
+              </button>
+            ))}
+          </nav>
+
+          {/* Right Side Actions */}
+          <div className="nav-actions">
+            {/* Profile Dropdown */}
+            <div className="profile-section">
+              <button
+                className="profile-btn"
+                onClick={() => navigate('/profile')}
+              >
+                <div className="profile-avatar">
+                  {user?.firstName?.charAt(0).toUpperCase() || 'U'}
+                </div>
+                <span className="profile-name">{user?.firstName || 'User'}</span>
+              </button>
+              <button className="logout-btn" onClick={handleLogout} title="Logout">
+                Exit
+              </button>
+            </div>
+
+            {/* Mobile Menu Toggle */}
+            <button
+              className="mobile-menu-toggle"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label="Toggle menu"
             >
-              <span className="nav-icon">{item.icon}</span>
-              {sidebarOpen && <span className="nav-label">{item.label}</span>}
-            </a>
-          ))}
-        </nav>
-
-        <div className="sidebar-footer">
-          <button className="btn btn-secondary btn-block" onClick={handleLogout}>
-            {sidebarOpen ? '🚪 Logout' : '🚪'}
-          </button>
+              <span className={`hamburger ${mobileMenuOpen ? 'open' : ''}`}>
+                <span></span>
+                <span></span>
+                <span></span>
+              </span>
+            </button>
+          </div>
         </div>
-      </aside>
+
+        {/* Mobile Navigation */}
+        <nav className={`nav-menu mobile-nav ${mobileMenuOpen ? 'open' : ''}`}>
+          {menuItems.map((item) => (
+            <button
+              key={item.path}
+              className={`nav-link ${location.pathname === item.path ? 'active' : ''}`}
+              onClick={() => handleNavClick(item.path)}
+            >
+              <span className="nav-link-icon">{item.icon}</span>
+              <span className="nav-link-text">{item.label}</span>
+            </button>
+          ))}
+          <button className="nav-link logout-mobile" onClick={handleLogout}>
+            <span className="nav-link-icon">X</span>
+            <span className="nav-link-text">Logout</span>
+          </button>
+        </nav>
+      </header>
 
       {/* Main Content */}
-      <main className="main-content">
-        {/* Top Bar */}
-        <header className="top-bar">
-          <div className="top-bar-left">
-            <button
-              className="hamburger"
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              title="Toggle sidebar"
-            >
-              ☰
-            </button>
-            <h2>NutriTrack</h2>
-          </div>
-
-          <div className="top-bar-right">
-            <div className="user-info">
-              <span className="user-name">{user?.firstName || 'User'}</span>
-              <div className="user-avatar">
-                {user?.firstName?.charAt(0).toUpperCase()}
-              </div>
-            </div>
-          </div>
-        </header>
-
-        {/* Page Content */}
-        <div className="page-content">
+      <main className="main-content-horizontal">
+        <div className="page-container">
           <Outlet />
         </div>
       </main>
+
+      {/* Footer */}
+      <footer className="app-footer">
+        <p>NutriTrack - Your Nutrition Companion</p>
+      </footer>
     </div>
   );
 };
